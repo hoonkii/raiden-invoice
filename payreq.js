@@ -8,22 +8,6 @@ const BN = require('bn.js')
 const bitcoinjsAddress = require('bitcoinjs-lib/src/address')
 const cloneDeep = require('lodash/cloneDeep')
 const coininfo = require('coininfo')
-
-// const BITCOINJS_NETWORK_INFO = {
-//   bitcoin: coininfo.bitcoin.main.toBitcoinJS(),
-//   testnet: coininfo.bitcoin.test.toBitcoinJS(),
-//   regtest: coininfo.bitcoin.regtest.toBitcoinJS(),
-//   litecoin: coininfo.litecoin.main.toBitcoinJS(),
-//   litecoin_testnet: coininfo.litecoin.test.toBitcoinJS()
-// }
-// BITCOINJS_NETWORK_INFO.bitcoin.bech32 = 'bc'
-// BITCOINJS_NETWORK_INFO.testnet.bech32 = 'tb'
-// BITCOINJS_NETWORK_INFO.regtest.bech32 = 'bcrt'
-// BITCOINJS_NETWORK_INFO.litecoin.bech32 = 'ltc'
-// BITCOINJS_NETWORK_INFO.litecoin_testnet.bech32 = 'tltc'
-
-// defaults for encode; default timestamp is current time at call
-// const DEFAULTNETWORK = BITCOINJS_NETWORK_INFO[DEFAULTNETWORKSTRING]
 const DEFAULTEXPIRETIME = 3600
 const DEFAULTCLTVEXPIRY = 9
 const DEFAULTDESCRIPTION = ''
@@ -145,8 +129,8 @@ function wordsToBuffer (words, trim) {
 
 function hexToBuffer (hex) {
   if (hex !== undefined &&
-      (typeof hex === 'string' || hex instanceof String) &&
-      hex.match(/^([a-zA-Z0-9]{2})*$/)) {
+    (typeof hex === 'string' || hex instanceof String) &&
+    hex.match(/^([a-zA-Z0-9]{2})*$/)) {
     return Buffer.from(hex, 'hex')
   }
   return hex
@@ -345,7 +329,7 @@ function hrpToMillisat (hrpString, outputString) {
     : valueBN.mul(MILLISATS_PER_BTC)
 
   if (((divisor === 'p' && !valueBN.mod(new BN(10, 10)).eq(new BN(0, 10))) ||
-      millisatoshisBN.gt(MAX_MILLISATS))) {
+    millisatoshisBN.gt(MAX_MILLISATS))) {
     throw new Error('Amount is outside of valid range')
   }
 
@@ -451,7 +435,7 @@ function encode (inputData, addDefaults) {
 
   let code, addressHash, address
 
-  let prefix = 'insta'
+  let prefix = 'rn'
 
   let hrpString
   // calculate the smallest possible integer (removing zeroes) and add the best
@@ -482,29 +466,29 @@ function encode (inputData, addDefaults) {
   tags.forEach(tag => {
     const possibleTagNames = Object.keys(TAGENCODERS)
     if (canReconstruct) possibleTagNames.push(unknownTagName)
-    // check if the tagName exists in the encoders object, if not throw Error.
-    if (possibleTagNames.indexOf(tag.tagName) === -1) {
-      throw new Error('Unknown tag key: ' + tag.tagName)
-    }
+  // check if the tagName exists in the encoders object, if not throw Error.
+  if (possibleTagNames.indexOf(tag.tagName) === -1) {
+    throw new Error('Unknown tag key: ' + tag.tagName)
+  }
 
-    let words
-    if (tag.tagName !== unknownTagName) {
-      // each tag starts with 1 word code for the tag
-      tagWords.push(TAGCODES[tag.tagName])
+  let words
+  if (tag.tagName !== unknownTagName) {
+    // each tag starts with 1 word code for the tag
+    tagWords.push(TAGCODES[tag.tagName])
 
-      const encoder = TAGENCODERS[tag.tagName]
-      words = encoder(tag.data)
-    } else {
-      let result = unknownEncoder(tag.data)
-      tagWords.push(result.tagCode)
-      words = result.words
-    }
-    // after the tag code, 2 words are used to store the length (in 5 bit words) of the tag data
-    // (also left padded, most integers are left padded while buffers are right padded)
-    tagWords = tagWords.concat([0].concat(intBEToWords(words.length)).slice(-2))
-    // then append the tag data words
-    tagWords = tagWords.concat(words)
-  })
+    const encoder = TAGENCODERS[tag.tagName]
+    words = encoder(tag.data)
+  } else {
+    let result = unknownEncoder(tag.data)
+    tagWords.push(result.tagCode)
+    words = result.words
+  }
+  // after the tag code, 2 words are used to store the length (in 5 bit words) of the tag data
+  // (also left padded, most integers are left padded while buffers are right padded)
+  tagWords = tagWords.concat([0].concat(intBEToWords(words.length)).slice(-2))
+  // then append the tag data words
+  tagWords = tagWords.concat(words)
+})
 
   // the data part of the bech32 is TIMESTAMP || TAGS || SIGNATURE
   // currently dataWords = TIMESTAMP || TAGS
@@ -554,14 +538,14 @@ function encode (inputData, addDefaults) {
 // decode will only have extra comments that aren't covered in encode comments.
 // also if anything is hard to read I'll comment.
 function decode (paymentRequest) {
-  if (typeof paymentRequest !== 'string') throw new Error('Instapay Payment Request must be string')
-  if (paymentRequest.slice(0, 5).toLowerCase() !== 'insta') throw new Error('Not a proper instapay payment request')
+  if (typeof paymentRequest !== 'string') throw new Error('Raiden Payment Request must be string')
+  if (paymentRequest.slice(0, 2).toLowerCase() !== 'rn') throw new Error('Not a proper raiden payment request')
   let decoded = bech32.decode(paymentRequest, Number.MAX_SAFE_INTEGER)
   paymentRequest = paymentRequest.toLowerCase()
   let prefix = decoded.prefix
   let words = decoded.words
 
-  let coinNetwork = 'insta'
+  let coinNetwork = 'rn'
   // signature is always 104 words on the end
   // cutting off at the beginning helps since there's no way to tell
   // ahead of time how many tags there are.
@@ -583,11 +567,11 @@ function decode (paymentRequest) {
   // doesn't have anything, there's a good chance the last letter of the
   // coin type got captured by the third group, so just re-regex without
   // the number.
-  let prefixMatches = prefix.match(/^insta(\d*)([a-zA-Z]?)$/)
+  let prefixMatches = prefix.match(/^rn(\d*)([a-zA-Z]?)$/)
 
-  if (prefixMatches && !prefixMatches[2]) prefixMatches = prefix.match(/^insta(\S+)$/)
+  if (prefixMatches && !prefixMatches[2]) prefixMatches = prefix.match(/^rn(\S+)$/)
   if (!prefixMatches) {
-    throw new Error('Not a proper Instapay payment request')
+    throw new Error('Not a proper Raiden payment request')
   }
   let value = prefixMatches[1]
 

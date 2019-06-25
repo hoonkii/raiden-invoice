@@ -1,1 +1,1 @@
-A library for encoding and decoding Instapay network payment requests
+A library for encoding and decoding Raiden network payment requests
